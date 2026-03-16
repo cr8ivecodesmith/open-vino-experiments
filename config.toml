@@ -1,0 +1,5 @@
+[model]
+path = "$HF_HOME/hub/models--OpenVino--Phi-3.5-mini-instruct-int4-cw-ov/snapshots/e13dbac92f6bc43200ebaf556127ad49e1915086/"
+
+[device]
+default = "GPU"

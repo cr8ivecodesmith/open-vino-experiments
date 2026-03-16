@@ -1,3 +1,14 @@
 -e ./ov-testdata-scraper
 
+click>=8.0
+rich
+
 huggingface_hub
+nncf==2.18.0
+onnx==1.18
+optimum-intel==1.25
+transformers==4.51.3
+
+openvino==2026.0
+openvino-tokenizers==2026.0
+openvino-genai==2026.0
