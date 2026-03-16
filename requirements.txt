@@ -1,1 +1,3 @@
 -e ./ov-testdata-scraper
+
+huggingface_hub
