@@ -224,3 +224,6 @@ __marimo__/
 test_dbs/
 
 # Project-specific ignored list
+
+## OV test data output dir
+ov-testdata/
