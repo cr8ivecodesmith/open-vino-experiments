@@ -11,9 +11,9 @@ Example:
 
 from __future__ import annotations
 
+import json
 import os
 import sys
-import time
 import tomllib
 from pathlib import Path
 
@@ -111,11 +111,19 @@ def expand_path(raw: str) -> Path:
     default=None,
     help=f"Maximum number of tokens to generate [default: {DEFAULT_MAX_NEW_TOKENS}].",
 )
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    default=False,
+    help="Output results as JSON (suppresses all rich formatting).",
+)
 def main(
     prompt: str,
     model_path: str | None,
     device: str | None,
     max_new_tokens: int | None,
+    output_json: bool,
 ) -> None:
     config = load_config()
 
@@ -139,30 +147,72 @@ def main(
         max_new_tokens if max_new_tokens is not None else DEFAULT_MAX_NEW_TOKENS
     )
 
-    # -- show parameters -----------------------------------------------------
-    params_table = Table(show_header=False, box=None, padding=(0, 1))
-    params_table.add_column(style="bold cyan")
-    params_table.add_column()
-    params_table.add_row("Model", str(resolved_model))
-    params_table.add_row("Device", resolved_device)
-    params_table.add_row("Max tokens", str(resolved_tokens))
-    params_table.add_row("Prompt", prompt)
-    console.print(Panel(params_table, title="Parameters", border_style="dim"))
+    # -- show parameters (rich only) -----------------------------------------
+    if not output_json:
+        params_table = Table(show_header=False, box=None, padding=(0, 1))
+        params_table.add_column(style="bold cyan")
+        params_table.add_column()
+        params_table.add_row("Model", str(resolved_model))
+        params_table.add_row("Device", resolved_device)
+        params_table.add_row("Max tokens", str(resolved_tokens))
+        params_table.add_row("Prompt", prompt)
+        console.print(Panel(params_table, title="Parameters", border_style="dim"))
 
-    # -- load pipeline with a spinner ---------------------------------------
-    with console.status(
-        f"Loading model on [bold]{resolved_device}[/]...", spinner="dots"
-    ):
+    # -- load pipeline ------------------------------------------------------
+    if output_json:
         pipe = ov_genai.LLMPipeline(str(resolved_model), resolved_device)
+    else:
+        with console.status(
+            f"Loading model on [bold]{resolved_device}[/]...", spinner="dots"
+        ):
+            pipe = ov_genai.LLMPipeline(str(resolved_model), resolved_device)
 
     # -- generate -----------------------------------------------------------
-    t0 = time.perf_counter()
-    with console.status("Generating...", spinner="dots"):
-        result = pipe.generate(prompt, max_new_tokens=resolved_tokens)
-    elapsed = time.perf_counter() - t0
+    if output_json:
+        result = pipe.generate([prompt], max_new_tokens=resolved_tokens)
+    else:
+        with console.status("Generating...", spinner="dots"):
+            result = pipe.generate([prompt], max_new_tokens=resolved_tokens)
 
-    console.print(Panel(result, title="Generated Text", border_style="green"))
-    console.print(f"[dim]Completed in {_humanize_duration(elapsed)}[/]")
+    m = result.perf_metrics
+    total_s = m.get_generate_duration().mean / 1000
+
+    # -- output -------------------------------------------------------------
+    if output_json:
+        print(
+            json.dumps(
+                {
+                    "parameters": {
+                        "model": str(resolved_model),
+                        "device": resolved_device,
+                        "max_new_tokens": resolved_tokens,
+                        "prompt": prompt,
+                    },
+                    "output": result.texts[0],
+                    "metrics": {
+                        "tokens_in": m.get_num_input_tokens(),
+                        "tokens_out": m.get_num_generated_tokens(),
+                        "throughput_toks": round(m.get_throughput().mean, 1),
+                        "ttft_ms": round(m.get_ttft().mean, 1),
+                        "total_s": round(total_s, 2),
+                    },
+                },
+                indent=2,
+            )
+        )
+    else:
+        console.print(
+            Panel(result.texts[0], title="Generated Text", border_style="green"),
+        )
+        console.print(
+            f"[dim]"
+            f"{m.get_num_input_tokens()} in · "
+            f"{m.get_num_generated_tokens()} out · "
+            f"{m.get_throughput().mean:.1f} tok/s · "
+            f"ttft {m.get_ttft().mean:.0f}ms · "
+            f"{_humanize_duration(total_s)}"
+            f"[/]"
+        )
 
 
 if __name__ == "__main__":
