@@ -1,0 +1,82 @@
+[project]
+name = "open-vino-experiments"
+version = "0.1.0"
+description = "A collection of experiments and utilities for OpenVINO projects."
+readme = "README.md"
+license = "MIT"
+authors = [ { name = "Matt Lebrun" } ]
+requires-python = ">=3.12"
+
+dependencies = [
+    "click>=8.0",
+    "rich>=13.0",
+    "huggingface_hub",
+    "nncf==2.18.0",
+    "onnx==1.18",
+    "optimum-intel==1.25",
+    "transformers==4.51.3",
+    "openvino==2026.0",
+    "openvino-tokenizers==2026.0",
+    "openvino-genai==2026.0",
+    "ov-testdata-scraper",
+    "torch",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-xdist>=2.0",
+    "ruff>=0.9",
+    "mypy>=1.0",
+    "types-tqdm>=4.0",
+    "build>=0.10",
+]
+
+[tool.uv.sources]
+ov-testdata-scraper = { path = "./ov-testdata-scraper", editable = true }
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.ruff]
+line-length = 100
+exclude = [
+    "**/__pycache__",
+    ".venv",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "C90", # mccabe complexity
+    "D",   # pydocstyle (docstring checks)
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+plugins = []
+
+[[tool.mypy.overrides]]
+module = "ov_testdata_scraper.*"
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = "openvino_genai"
+ignore_missing_imports = true
+

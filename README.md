@@ -25,16 +25,13 @@ documentation.
 
 Requires Python 3.12+ and [`uv`](https://github.com/astral-sh/uv).
 
-> [!WARNING]
-> This is a very large venv (~7GB) mainly due to nvidia and torch dependencies. Make sure you have enough
-> disk space before proceeding.
-
 ```bash
-uv pip install -r requirements.txt
+uv sync
 ```
 
-This installs all sub-projects in editable mode, making their CLI entry points
-available in the active virtual environment.
+This installs all dependencies and sub-projects in editable mode, making their CLI entry points
+available in the active virtual environment. The project is configured to use CPU-only PyTorch,
+avoiding unnecessary NVIDIA CUDA dependencies.
 
 ## Samples
 
@@ -49,7 +46,7 @@ hf download OpenVino/Phi-3.5-mini-instruct-int4-cw-ov
 Run the text generation sample in `samples/text-generation`.
 
 ```bash
-uv run samples/text-generation.py -d NPU -m $HOME_HF/hub/<path-to-downloaded-snapshot> "The sun is yellow because"
+uv run samples/text_generation.py -d NPU -m $HOME_HF/hub/<path-to-downloaded-snapshot> "The sun is yellow because"
 ```
 
 **Results:**

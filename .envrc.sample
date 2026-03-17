@@ -1,2 +1,7 @@
-source .venv/bin/activate
-dotenv
+if [ -d ".venv" ]; then
+  source .venv/bin/activate
+fi
+
+if [ -f ".env" ]; then
+  dotenv
+fi

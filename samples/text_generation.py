@@ -4,7 +4,6 @@ Configuration is read from config.toml at the project root and can be
 overridden with CLI flags.
 
 Example:
-
     python samples/text_generation.py "The Sun is yellow because"
     python samples/text_generation.py -d CPU -n 200 "Explain quantum computing"
 """
@@ -125,6 +124,7 @@ def main(
     max_new_tokens: int | None,
     output_json: bool,
 ) -> None:
+    """Main entry point for the CLI."""
     config = load_config()
 
     # -- resolve model path (CLI > config > error) -------------------------
