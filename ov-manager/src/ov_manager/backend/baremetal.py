@@ -7,7 +7,7 @@ import subprocess
 
 import click
 
-from ov_manager.backend.base import PullParams, RegisterParams, RemoveParams
+from ov_manager.backend.base import PullParams, RegisterParams, RemoveParams, ServeParams
 
 
 class BaremetalBackend:
@@ -96,6 +96,54 @@ class BaremetalBackend:
             params.model_path,
         ]
         self._ovms(args)
+
+    def serve(self, params: ServeParams) -> None:
+        """Start the OVMS server via bare-metal ``ovms`` binary.
+
+        Both foreground and background modes write a PID file to the XDG
+        runtime directory so that ``server status`` and ``server stop`` can
+        detect the running process.
+
+        In foreground mode, blocks on ``proc.wait()`` and cleans up the PID
+        file when the process exits. In background mode, the PID file persists
+        until ``server stop`` removes it.
+
+        Args:
+            params: Serve parameters.
+        """
+        import subprocess as _subprocess
+
+        from ov_manager.runtime import get_runtime_dir, remove_pidfile, write_pidfile
+
+        binary = shutil.which(self.BINARY)
+        if binary is None:
+            raise click.ClickException(
+                f"'{self.BINARY}' not found on $PATH. Install OVMS or use --backend docker."
+            )
+
+        args = [
+            binary,
+            "--rest_port",
+            str(params.port),
+            "--config_path",
+            str(params.config_json_path),
+        ]
+
+        click.echo(f"$ {' '.join(args)}")
+
+        proc = _subprocess.Popen(args)
+        pidfile = get_runtime_dir() / "ovmgr-server.pid"
+        write_pidfile(pidfile, proc.pid)
+
+        if params.background:
+            click.echo(f"OVMS started in background (PID {proc.pid}).")
+        else:
+            try:
+                proc.wait()
+            finally:
+                remove_pidfile(pidfile)
+            if proc.returncode != 0:
+                raise click.ClickException(f"'{self.BINARY}' exited with code {proc.returncode}.")
 
     def remove(self, params: RemoveParams) -> None:
         """Unregister a model via ``ovms --remove_from_config``.

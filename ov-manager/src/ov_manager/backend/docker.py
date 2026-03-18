@@ -8,7 +8,7 @@ import subprocess
 
 import click
 
-from ov_manager.backend.base import PullParams, RegisterParams, RemoveParams
+from ov_manager.backend.base import PullParams, RegisterParams, RemoveParams, ServeParams
 
 
 class DockerBackend:
@@ -141,3 +141,50 @@ class DockerBackend:
             params.model_name,
         ]
         self._docker(ovms_args, str(params.config_json_path.parent))
+
+    def serve(self, params: ServeParams) -> None:
+        """Start the OVMS server via Docker container.
+
+        Uses container name ``ovmgr-server`` for lifecycle management.
+
+        Args:
+            params: Serve parameters.
+        """
+        if shutil.which("docker") is None:
+            raise click.ClickException(
+                "'docker' not found on $PATH. Install Docker or use --backend baremetal."
+            )
+
+        uid = os.getuid()
+        gid = os.getgid()
+
+        cmd = [
+            "docker",
+            "run",
+            "--rm",
+            "--name",
+            "ovmgr-server",
+            "-u",
+            f"{uid}:{gid}",
+            "-v",
+            f"{params.models_dir}:/models",
+            "-p",
+            f"{params.host}:{params.port}:8000",
+        ]
+
+        if params.background:
+            cmd.insert(2, "-d")
+
+        cmd += [
+            self.image,
+            "--rest_port",
+            "8000",
+            "--config_path",
+            "/models/config.json",
+        ]
+
+        click.echo(f"$ {' '.join(cmd)}")
+
+        result = subprocess.run(cmd)
+        if result.returncode != 0:
+            raise click.ClickException(f"Docker container exited with code {result.returncode}.")

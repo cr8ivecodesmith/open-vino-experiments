@@ -13,6 +13,7 @@ HuggingFace token resolution:
 from __future__ import annotations
 
 import os
+import shutil
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -27,6 +28,12 @@ DEFAULT_MODELS_DIR = Path.home() / ".models"
 DEFAULT_CACHE_DIR = Path.home() / ".models" / "cache"
 DEFAULT_DOCKER_IMAGE = "openvino/model_server:latest"
 
+DEFAULT_SERVER_HOST = "127.0.0.1"
+DEFAULT_SERVER_PORT = 8100
+DEFAULT_WEBUI_HOST = "127.0.0.1"
+DEFAULT_WEBUI_PORT = 3100
+DEFAULT_WEBUI_IMAGE = "ghcr.io/open-webui/open-webui:main"
+
 
 @dataclass
 class Config:
@@ -37,6 +44,16 @@ class Config:
     cache_dir: Path = field(default_factory=lambda: DEFAULT_CACHE_DIR)
     hf_token: str | None = None
     docker_image: str = DEFAULT_DOCKER_IMAGE
+
+    # Server
+    server_host: str = DEFAULT_SERVER_HOST
+    server_port: int = DEFAULT_SERVER_PORT
+
+    # Open WebUI
+    webui_host: str = DEFAULT_WEBUI_HOST
+    webui_port: int = DEFAULT_WEBUI_PORT
+    webui_data_dir: Path | None = None
+    webui_image: str = DEFAULT_WEBUI_IMAGE
 
     @property
     def config_json_path(self) -> Path:
@@ -115,6 +132,12 @@ def resolve(
     cache_dir: Path | None = None,
     hf_token: str | None = None,
     docker_image: str | None = None,
+    server_host: str | None = None,
+    server_port: int | None = None,
+    webui_host: str | None = None,
+    webui_port: int | None = None,
+    webui_data_dir: Path | None = None,
+    webui_image: str | None = None,
     cwd: Path | None = None,
 ) -> Config:
     """Build a :class:`Config` by merging all sources in priority order.
@@ -125,6 +148,12 @@ def resolve(
         cache_dir: CLI-provided cache directory override.
         hf_token: CLI-provided HuggingFace token override.
         docker_image: CLI-provided Docker image override.
+        server_host: CLI-provided server host override.
+        server_port: CLI-provided server port override.
+        webui_host: CLI-provided WebUI host override.
+        webui_port: CLI-provided WebUI port override.
+        webui_data_dir: CLI-provided WebUI data directory override.
+        webui_image: CLI-provided WebUI Docker image override.
         cwd: Directory to search for ``ov-manager.toml``. Defaults to cwd.
 
     Returns:
@@ -143,6 +172,17 @@ def resolve(
             return str(toml_val)
         return default
 
+    def _resolve_int(cli_val: int | None, env_key: str, toml_key: str, default: int) -> int:
+        if cli_val is not None:
+            return cli_val
+        env_val = os.environ.get(env_key)
+        if env_val:
+            return int(env_val)
+        toml_val = toml.get(toml_key)
+        if toml_val is not None:
+            return int(toml_val)
+        return default
+
     def _resolve_path(cli_val: Path | None, env_key: str, toml_key: str, default: Path) -> Path:
         if cli_val is not None:
             return cli_val.expanduser().resolve()
@@ -153,6 +193,21 @@ def resolve(
         if toml_val:
             return Path(str(toml_val)).expanduser().resolve()
         return default.expanduser().resolve()
+
+    def _resolve_optional_path(
+        cli_val: Path | None,
+        env_key: str,
+        toml_key: str,
+    ) -> Path | None:
+        if cli_val is not None:
+            return cli_val.expanduser().resolve()
+        env_val = os.environ.get(env_key)
+        if env_val:
+            return Path(env_val).expanduser().resolve()
+        toml_val = toml.get(toml_key)
+        if toml_val:
+            return Path(str(toml_val)).expanduser().resolve()
+        return None
 
     def _resolve_token() -> str | None:
         if hf_token is not None:
@@ -172,6 +227,19 @@ def resolve(
             f"Invalid backend {resolved_backend!r}. Must be one of: {', '.join(VALID_BACKENDS)}"
         )
 
+    # Resolve "auto" to a concrete backend: baremetal > docker
+    if resolved_backend == "auto":
+        if shutil.which("ovms"):
+            resolved_backend = "baremetal"
+        elif shutil.which("docker"):
+            resolved_backend = "docker"
+        else:
+            raise click.ClickException(
+                "No OVMS backend found. Install 'ovms' on $PATH for bare-metal, "
+                "or install Docker for the docker backend. "
+                "You can also set --backend explicitly."
+            )
+
     return Config(
         backend=resolved_backend,
         models_dir=_resolve_path(models_dir, "OVMGR_MODELS_DIR", "models_dir", DEFAULT_MODELS_DIR),
@@ -179,5 +247,19 @@ def resolve(
         hf_token=_resolve_token(),
         docker_image=_resolve_str(
             docker_image, "OVMGR_DOCKER_IMAGE", "docker_image", DEFAULT_DOCKER_IMAGE
+        ),
+        server_host=_resolve_str(
+            server_host, "OVMGR_SERVER_HOST", "server_host", DEFAULT_SERVER_HOST
+        ),
+        server_port=_resolve_int(
+            server_port, "OVMGR_SERVER_PORT", "server_port", DEFAULT_SERVER_PORT
+        ),
+        webui_host=_resolve_str(webui_host, "OVMGR_WEBUI_HOST", "webui_host", DEFAULT_WEBUI_HOST),
+        webui_port=_resolve_int(webui_port, "OVMGR_WEBUI_PORT", "webui_port", DEFAULT_WEBUI_PORT),
+        webui_data_dir=_resolve_optional_path(
+            webui_data_dir, "OVMGR_WEBUI_DATA_DIR", "webui_data_dir"
+        ),
+        webui_image=_resolve_str(
+            webui_image, "OVMGR_WEBUI_IMAGE", "webui_image", DEFAULT_WEBUI_IMAGE
         ),
     )

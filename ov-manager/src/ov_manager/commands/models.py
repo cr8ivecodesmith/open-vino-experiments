@@ -357,7 +357,7 @@ def get_model(
     cache_size: int | None,
     token: str | None,
 ) -> None:
-    """Download and register a model from HuggingFace.
+    r"""Download and register a model from HuggingFace.
 
     SOURCE_MODEL is the HuggingFace model ID, e.g.:
 
@@ -423,8 +423,8 @@ def get_model(
 
     if already_registered and not overwrite:
         console.print(
-            f"[yellow]Already registered in config.json — skipping registration.[/yellow]\n"
-            f"Use [bold]--overwrite[/bold] to force re-registration."
+            "[yellow]Already registered in config.json — skipping registration.[/yellow]\n"
+            "Use [bold]--overwrite[/bold] to force re-registration."
         )
     else:
         if already_registered and overwrite:

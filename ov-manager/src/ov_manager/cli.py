@@ -15,6 +15,7 @@ from pathlib import Path
 import click
 
 from ov_manager.commands.models import models
+from ov_manager.commands.server import server
 from ov_manager.config import VALID_BACKENDS, resolve
 
 
@@ -76,3 +77,4 @@ def main(
 
 
 main.add_command(models)
+main.add_command(server)

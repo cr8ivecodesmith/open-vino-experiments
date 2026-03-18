@@ -90,6 +90,25 @@ class RemoveParams:
     model_name: str
 
 
+@dataclass
+class ServeParams:
+    """Parameters for starting the OVMS server.
+
+    Attributes:
+        config_json_path: Full path to the OVMS config.json file.
+        models_dir: Local directory for the model repository.
+        host: Host address to bind the REST API to.
+        port: Port for the REST API.
+        background: If True, run in the background (daemon/detached).
+    """
+
+    config_json_path: Path
+    models_dir: Path
+    host: str = "127.0.0.1"
+    port: int = 8100
+    background: bool = False
+
+
 @runtime_checkable
 class Backend(Protocol):
     """Protocol that all backend implementations must satisfy."""
@@ -115,5 +134,13 @@ class Backend(Protocol):
 
         Args:
             params: Remove parameters.
+        """
+        ...
+
+    def serve(self, params: ServeParams) -> None:
+        """Start the OVMS server.
+
+        Args:
+            params: Serve parameters.
         """
         ...

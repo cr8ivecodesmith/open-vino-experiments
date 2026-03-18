@@ -27,3 +27,31 @@
 # Docker image to use when backend = "docker"
 # env: OVMGR_DOCKER_IMAGE
 # docker_image = "openvino/model_server:latest"
+
+# --- Server ---
+
+# OVMS REST API bind address
+# env: OVMGR_SERVER_HOST
+# server_host = "127.0.0.1"
+
+# OVMS REST API port
+# env: OVMGR_SERVER_PORT
+# server_port = 8100
+
+# --- Open WebUI ---
+
+# WebUI bind address
+# env: OVMGR_WEBUI_HOST
+# webui_host = "127.0.0.1"
+
+# WebUI port
+# env: OVMGR_WEBUI_PORT
+# webui_port = 3100
+
+# Host directory for persistent WebUI data
+# env: OVMGR_WEBUI_DATA_DIR
+# webui_data_dir = ""
+
+# Docker image for Open WebUI
+# env: OVMGR_WEBUI_IMAGE
+# webui_image = "ghcr.io/open-webui/open-webui:main"
