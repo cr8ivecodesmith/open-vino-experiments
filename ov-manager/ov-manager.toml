@@ -1,0 +1,29 @@
+# ov-manager configuration file
+# All values here are overridden by OVMGR_* environment variables or CLI flags.
+# Uncomment and edit to customise defaults for this project.
+#
+# Config file location resolution order:
+#   1. OVMGR_CONFIG=/path/to/ov-manager.toml  (explicit override)
+#   2. Search upward from cwd to git root for ov-manager.toml
+#   3. ~/.config/ov-manager/ov-manager.toml   (user-level fallback)
+
+# Execution backend: "auto", "baremetal", or "docker"
+# auto: use bare-metal `ovms` if on $PATH, otherwise fall back to docker
+# backend = "auto"
+
+# Directory where model files are stored
+# env: OVMGR_MODELS_DIR
+# models_dir = "~/.models"
+
+# Directory used by OVMS for compiled model cache
+# env: OVMGR_CACHE_DIR
+# cache_dir = "~/.models/cache"
+
+# HuggingFace token for downloading gated models.
+# env: OVMGR_HF_TOKEN
+# Falls back to $HF_TOKEN if not set here.
+# hf_token = ""
+
+# Docker image to use when backend = "docker"
+# env: OVMGR_DOCKER_IMAGE
+# docker_image = "openvino/model_server:latest"

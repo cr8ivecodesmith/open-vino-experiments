@@ -1,7 +1,7 @@
 [project]
-name = "open-vino-experiments"
+name = "ov-manager"
 version = "0.1.0"
-description = "A collection of experiments and utilities for OpenVINO projects."
+description = "OpenVINO Model Server manager: download, register, and inspect models."
 readme = "README.md"
 license = "MIT"
 authors = [ { name = "Matt Lebrun" } ]
@@ -10,38 +10,33 @@ requires-python = ">=3.12"
 dependencies = [
     "click>=8.0",
     "rich>=13.0",
-    "huggingface_hub",
-    "nncf==2.18.0",
-    "onnx==1.18",
-    "optimum-intel==1.25",
-    "transformers==4.51.3",
-    "openvino==2026.0",
-    "openvino-tokenizers==2026.0",
-    "openvino-genai==2026.0",
-    "ov-testdata-scraper",
-    "ov-manager",
-    "torch",
 ]
+
+[project.scripts]
+ov-manage = "ov_manager.cli:main"
 
 [project.optional-dependencies]
 dev = [
     "pytest>=6.0",
-    "pytest-xdist>=2.0",
     "ruff>=0.9",
     "mypy>=1.0",
-    "types-tqdm>=4.0",
     "build>=0.10",
 ]
 
-[tool.uv.sources]
-ov-testdata-scraper = { path = "./ov-testdata-scraper", editable = true }
-ov-manager = { path = "./ov-manager", editable = true }
-torch = { index = "pytorch-cpu" }
+[tool.setuptools.packages.find]
+where = ["src"]
 
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+python_files = ["tests.py", "test_*.py"]
+markers = [
+    "unit: Unit tests that run fast and don't hit external services",
+    "integration: Integration tests that may involve multiple components",
+    "slow: Slow tests that may involve external services",
+]
 
 [tool.ruff]
 line-length = 100
@@ -75,10 +70,5 @@ check_untyped_defs = true
 plugins = []
 
 [[tool.mypy.overrides]]
-module = "ov_testdata_scraper.*"
+module = "ov_manager.*"
 warn_unused_ignores = true
-
-[[tool.mypy.overrides]]
-module = "openvino_genai"
-ignore_missing_imports = true
-

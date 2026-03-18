@@ -1421,6 +1421,7 @@ dependencies = [
     { name = "openvino-genai" },
     { name = "openvino-tokenizers" },
     { name = "optimum-intel" },
+    { name = "ov-manager" },
     { name = "ov-testdata-scraper" },
     { name = "rich" },
     { name = "torch", version = "2.10.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
@@ -1450,6 +1451,7 @@ requires-dist = [
     { name = "openvino-genai", specifier = "==2026.0" },
     { name = "openvino-tokenizers", specifier = "==2026.0" },
     { name = "optimum-intel", specifier = "==1.25" },
+    { name = "ov-manager", editable = "ov-manager" },
     { name = "ov-testdata-scraper", editable = "ov-testdata-scraper" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=6.0" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=2.0" },
@@ -1568,6 +1570,26 @@ sdist = { url = "https://files.pythonhosted.org/packages/34/4c/09d59af80995288f7
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fb/7c/6d32b30ddbca07ede52e070bd4ae07b303acb2f2d9b8ee642028cc0ee5d6/optimum_intel-1.25.0-py3-none-any.whl", hash = "sha256:f65a8632cc6b768de9ae8fc2843ae6f3952c2e66e9f89cb475c3d121aba53e99", size = 358860, upload-time = "2025-08-04T16:41:26.005Z" },
 ]
+
+[[package]]
+name = "ov-manager"
+version = "0.1.0"
+source = { editable = "ov-manager" }
+dependencies = [
+    { name = "click" },
+    { name = "rich" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "build", marker = "extra == 'dev'", specifier = ">=0.10" },
+    { name = "click", specifier = ">=8.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=6.0" },
+    { name = "rich", specifier = ">=13.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.9" },
+]
+provides-extras = ["dev"]
 
 [[package]]
 name = "ov-testdata-scraper"

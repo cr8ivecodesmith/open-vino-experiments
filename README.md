@@ -10,6 +10,8 @@ A workspace for OpenVINO tooling experiments and utilities.
 - [Intel GPU Drivers](https://dgpu-docs.intel.com/driver/client/overview.html)
 - [Intel NPU Drivers](https://github.com/intel/linux-npu-driver)
 - [OpenVINO Runtime](https://docs.openvino.ai/2026/get-started/install-openvino/install-openvino-linux.html)
+- [OpenVINO Model Server](https://docs.openvino.ai/2026/model-server/ovms_what_is_openvino_model_server.html)
+- Docker (for running OVMS in a containerized environment)
 
 
 ## Projects
@@ -46,7 +48,7 @@ hf download OpenVino/Phi-3.5-mini-instruct-int4-cw-ov
 Run the text generation sample in `samples/text-generation`.
 
 ```bash
-uv run samples/text_generation.py -d NPU -m $HOME_HF/hub/<path-to-downloaded-snapshot> "The sun is yellow because"
+uv run samples/text_generation.py -d NPU -m $HF_HOME/hub/<path-to-downloaded-snapshot> "The sun is yellow because"
 ```
 
 **Results:**
