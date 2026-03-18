@@ -5,7 +5,8 @@ Usage::
     ov-manage models list
     ov-manage models list --json
     ov-manage --backend docker models get OpenVINO/whisper-base-fp16-ov --task text_generation
-    ov-manage --models-dir /data/models models get OpenVINO/FLUX.1-schnell-int4-ov --task image_generation
+    ov-manage --models-dir /data/models models get OpenVINO/FLUX.1-schnell-int4-ov \
+        --task image_generation
 """
 
 from __future__ import annotations

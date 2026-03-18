@@ -239,6 +239,106 @@ def get_service_statuses(backend: str) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# Helpers — Address parsing
+# ---------------------------------------------------------------------------
+
+
+def _parse_address(raw: str, default_host: str, default_port: int) -> tuple[str, int]:
+    """Parse an optional ``HOST:PORT`` string, filling in defaults."""
+    parts = raw.rsplit(":", 1)
+    if len(parts) == 2:
+        return parts[0] or default_host, int(parts[1])
+    return default_host, int(parts[0])
+
+
+# ---------------------------------------------------------------------------
+# Helpers — run_server sub-flows
+# ---------------------------------------------------------------------------
+
+
+def _run_background(
+    *,
+    config: Config,
+    serve_params: ServeParams,
+    webui_address: str | None,
+    webui_host: str,
+    webui_port: int,
+    resolved_webui_data: Path | None,
+    resolved_webui_image: str,
+) -> None:
+    """Start OVMS (and optionally WebUI) in the background and print a summary."""
+    console.rule("[bold]Starting OVMS (background)[/bold]")
+    get_backend(config).serve(serve_params)
+
+    if webui_address is not None:
+        console.rule("[bold]Starting Open WebUI (background)[/bold]")
+        start_webui(
+            host=webui_host,
+            port=webui_port,
+            ovms_port=serve_params.port,
+            image=resolved_webui_image,
+            data_dir=resolved_webui_data,
+            background=True,
+        )
+
+    webui_line = f"WebUI: [cyan]{webui_host}:{webui_port}[/cyan]\n" if webui_address else ""
+    console.print(
+        Panel(
+            f"[bold green]Services started in background.[/bold green]\n"
+            f"OVMS: [cyan]{serve_params.host}:{serve_params.port}[/cyan]\n"
+            + webui_line
+            + "\nRun [bold]ov-manage server stop[/bold] to stop.",
+            title="Running",
+            border_style="green",
+        )
+    )
+
+
+def _run_foreground(
+    *,
+    config: Config,
+    serve_params: ServeParams,
+    webui_address: str | None,
+    webui_host: str,
+    webui_port: int,
+    resolved_webui_data: Path | None,
+    resolved_webui_image: str,
+) -> None:
+    """Start OVMS in the foreground with signal handling for clean shutdown."""
+    webui_started = False
+
+    def _shutdown(sig: int, frame: Any) -> None:
+        console.print("\n[yellow]Shutting down...[/yellow]")
+        stop_services(service=None, backend=config.backend)
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, _shutdown)
+    signal.signal(signal.SIGTERM, _shutdown)
+
+    if webui_address is not None:
+        # Start WebUI in background (Docker -d) so we can block on OVMS
+        console.rule("[bold]Starting Open WebUI (background)[/bold]")
+        start_webui(
+            host=webui_host,
+            port=webui_port,
+            ovms_port=serve_params.port,
+            image=resolved_webui_image,
+            data_dir=resolved_webui_data,
+            background=True,
+        )
+        webui_started = True
+
+    console.rule(f"[bold]Starting OVMS on {serve_params.host}:{serve_params.port}[/bold]")
+    console.print("[dim]Press Ctrl+C to stop.[/dim]")
+
+    try:
+        get_backend(config).serve(serve_params)
+    finally:
+        if webui_started:
+            _stop_docker_container(WEBUI_CONTAINER)
+
+
+# ---------------------------------------------------------------------------
 # CLI commands
 # ---------------------------------------------------------------------------
 
@@ -276,39 +376,26 @@ def run_server(
     \b
     ADDRESS is optional HOST:PORT for OVMS (default: 127.0.0.1:8100).
     """
-    # Parse OVMS address
-    ovms_host = config.server_host
-    ovms_port = config.server_port
-    if address:
-        parts = address.rsplit(":", 1)
-        if len(parts) == 2:
-            ovms_host = parts[0] or ovms_host
-            ovms_port = int(parts[1])
-        else:
-            ovms_port = int(parts[0])
-
-    # Parse WebUI address
-    webui_host = config.webui_host
-    webui_port = config.webui_port
-    if webui_address and webui_address != "default":
-        parts = webui_address.rsplit(":", 1)
-        if len(parts) == 2:
-            webui_host = parts[0] or webui_host
-            webui_port = int(parts[1])
-        else:
-            webui_port = int(parts[0])
+    ovms_host, ovms_port = (
+        _parse_address(address, config.server_host, config.server_port)
+        if address
+        else (config.server_host, config.server_port)
+    )
+    webui_host, webui_port = (
+        _parse_address(webui_address, config.webui_host, config.webui_port)
+        if webui_address and webui_address != "default"
+        else (config.webui_host, config.webui_port)
+    )
 
     resolved_webui_data = webui_data or config.webui_data_dir
     resolved_webui_image = webui_image or config.webui_image
 
-    # Ensure config.json exists
     if not config.config_json_path.exists():
         raise click.ClickException(
             f"No config.json found at {config.config_json_path}. "
             "Run 'ov-manage models get' first to download and register a model."
         )
 
-    backend = get_backend(config)
     serve_params = ServeParams(
         config_json_path=config.config_json_path,
         models_dir=config.models_dir,
@@ -317,66 +404,19 @@ def run_server(
         background=detach,
     )
 
+    kwargs: dict[str, Any] = dict(
+        config=config,
+        serve_params=serve_params,
+        webui_address=webui_address,
+        webui_host=webui_host,
+        webui_port=webui_port,
+        resolved_webui_data=resolved_webui_data,
+        resolved_webui_image=resolved_webui_image,
+    )
     if detach:
-        # Background: start OVMS, then WebUI if requested
-        console.rule("[bold]Starting OVMS (background)[/bold]")
-        backend.serve(serve_params)
-
-        if webui_address is not None:
-            console.rule("[bold]Starting Open WebUI (background)[/bold]")
-            start_webui(
-                host=webui_host,
-                port=webui_port,
-                ovms_port=ovms_port,
-                image=resolved_webui_image,
-                data_dir=resolved_webui_data,
-                background=True,
-            )
-
-        console.print(
-            Panel(
-                f"[bold green]Services started in background.[/bold green]\n"
-                f"OVMS: [cyan]{ovms_host}:{ovms_port}[/cyan]\n"
-                + (f"WebUI: [cyan]{webui_host}:{webui_port}[/cyan]\n" if webui_address else "")
-                + "\nRun [bold]ov-manage server stop[/bold] to stop.",
-                title="Running",
-                border_style="green",
-            )
-        )
+        _run_background(**kwargs)
     else:
-        # Foreground: set up signal handler for clean shutdown
-        webui_started = False
-
-        def _shutdown(sig: int, frame: Any) -> None:
-            console.print("\n[yellow]Shutting down...[/yellow]")
-            stop_services(service=None, backend=config.backend)
-            sys.exit(0)
-
-        signal.signal(signal.SIGINT, _shutdown)
-        signal.signal(signal.SIGTERM, _shutdown)
-
-        if webui_address is not None:
-            # Start WebUI in background (Docker -d) even in foreground mode
-            # so we can block on OVMS in the foreground
-            console.rule("[bold]Starting Open WebUI (background)[/bold]")
-            start_webui(
-                host=webui_host,
-                port=webui_port,
-                ovms_port=ovms_port,
-                image=resolved_webui_image,
-                data_dir=resolved_webui_data,
-                background=True,
-            )
-            webui_started = True
-
-        console.rule(f"[bold]Starting OVMS on {ovms_host}:{ovms_port}[/bold]")
-        console.print("[dim]Press Ctrl+C to stop.[/dim]")
-
-        try:
-            backend.serve(serve_params)
-        finally:
-            if webui_started:
-                _stop_docker_container(WEBUI_CONTAINER)
+        _run_foreground(**kwargs)
 
 
 @server.command("stop")

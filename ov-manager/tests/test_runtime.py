@@ -39,10 +39,12 @@ def test_fallback_when_xdg_unset(monkeypatch, tmp_path):
     # Use a controlled tmpdir to avoid creating dirs in real /tmp
     monkeypatch.setattr("tempfile.gettempdir", lambda: str(tmp_path))
 
-    result = runtime_mod.get_runtime_dir()
-
     uid = os.getuid()
     expected_parent = tmp_path / f"runtime-{uid}" / "ov-manager"
+
+    with pytest.warns(RuntimeWarning, match="XDG_RUNTIME_DIR is not set"):
+        result = runtime_mod.get_runtime_dir()
+
     assert result == expected_parent
     assert result.exists()
 

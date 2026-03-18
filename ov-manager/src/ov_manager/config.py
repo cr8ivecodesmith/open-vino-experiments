@@ -125,6 +125,94 @@ def _load_toml(cwd: Path | None = None) -> dict:
         return tomllib.load(fh)
 
 
+def _resolve_str(toml: dict, cli_val: str | None, env_key: str, toml_key: str, default: str) -> str:
+    if cli_val is not None:
+        return cli_val
+    env_val = os.environ.get(env_key)
+    if env_val:
+        return env_val
+    toml_val = toml.get(toml_key)
+    if toml_val:
+        return str(toml_val)
+    return default
+
+
+def _resolve_int(toml: dict, cli_val: int | None, env_key: str, toml_key: str, default: int) -> int:
+    if cli_val is not None:
+        return cli_val
+    env_val = os.environ.get(env_key)
+    if env_val:
+        return int(env_val)
+    toml_val = toml.get(toml_key)
+    if toml_val is not None:
+        return int(toml_val)
+    return default
+
+
+def _resolve_path(
+    toml: dict, cli_val: Path | None, env_key: str, toml_key: str, default: Path
+) -> Path:
+    if cli_val is not None:
+        return cli_val.expanduser().resolve()
+    env_val = os.environ.get(env_key)
+    if env_val:
+        return Path(env_val).expanduser().resolve()
+    toml_val = toml.get(toml_key)
+    if toml_val:
+        return Path(str(toml_val)).expanduser().resolve()
+    return default.expanduser().resolve()
+
+
+def _resolve_optional_path(
+    toml: dict,
+    cli_val: Path | None,
+    env_key: str,
+    toml_key: str,
+) -> Path | None:
+    if cli_val is not None:
+        return cli_val.expanduser().resolve()
+    env_val = os.environ.get(env_key)
+    if env_val:
+        return Path(env_val).expanduser().resolve()
+    toml_val = toml.get(toml_key)
+    if toml_val:
+        return Path(str(toml_val)).expanduser().resolve()
+    return None
+
+
+def _resolve_token(toml: dict, hf_token: str | None) -> str | None:
+    if hf_token is not None:
+        return hf_token
+    for key in ("OVMGR_HF_TOKEN", "HF_TOKEN"):
+        val = os.environ.get(key)
+        if val:
+            return val
+    toml_val = toml.get("hf_token")
+    if toml_val:
+        return str(toml_val)
+    return None
+
+
+def _resolve_backend(toml: dict, backend: str | None) -> str:
+    """Resolve backend to a concrete value (never ``'auto'``)."""
+    resolved = _resolve_str(toml, backend, "OVMGR_BACKEND", "backend", DEFAULT_BACKEND)
+    if resolved not in VALID_BACKENDS:
+        raise ValueError(
+            f"Invalid backend {resolved!r}. Must be one of: {', '.join(VALID_BACKENDS)}"
+        )
+    if resolved == "auto":
+        if shutil.which("ovms"):
+            return "baremetal"
+        if shutil.which("docker"):
+            return "docker"
+        raise click.ClickException(
+            "No OVMS backend found. Install 'ovms' on $PATH for bare-metal, "
+            "or install Docker for the docker backend. "
+            "You can also set --backend explicitly."
+        )
+    return resolved
+
+
 def resolve(
     *,
     backend: str | None = None,
@@ -161,105 +249,28 @@ def resolve(
     """
     toml = _load_toml(cwd)
 
-    def _resolve_str(cli_val: str | None, env_key: str, toml_key: str, default: str) -> str:
-        if cli_val is not None:
-            return cli_val
-        env_val = os.environ.get(env_key)
-        if env_val:
-            return env_val
-        toml_val = toml.get(toml_key)
-        if toml_val:
-            return str(toml_val)
-        return default
+    def _str(cli_val: str | None, env_key: str, toml_key: str, default: str) -> str:
+        return _resolve_str(toml, cli_val, env_key, toml_key, default)
 
-    def _resolve_int(cli_val: int | None, env_key: str, toml_key: str, default: int) -> int:
-        if cli_val is not None:
-            return cli_val
-        env_val = os.environ.get(env_key)
-        if env_val:
-            return int(env_val)
-        toml_val = toml.get(toml_key)
-        if toml_val is not None:
-            return int(toml_val)
-        return default
+    def _int(cli_val: int | None, env_key: str, toml_key: str, default: int) -> int:
+        return _resolve_int(toml, cli_val, env_key, toml_key, default)
 
-    def _resolve_path(cli_val: Path | None, env_key: str, toml_key: str, default: Path) -> Path:
-        if cli_val is not None:
-            return cli_val.expanduser().resolve()
-        env_val = os.environ.get(env_key)
-        if env_val:
-            return Path(env_val).expanduser().resolve()
-        toml_val = toml.get(toml_key)
-        if toml_val:
-            return Path(str(toml_val)).expanduser().resolve()
-        return default.expanduser().resolve()
+    def _path(cli_val: Path | None, env_key: str, toml_key: str, default: Path) -> Path:
+        return _resolve_path(toml, cli_val, env_key, toml_key, default)
 
-    def _resolve_optional_path(
-        cli_val: Path | None,
-        env_key: str,
-        toml_key: str,
-    ) -> Path | None:
-        if cli_val is not None:
-            return cli_val.expanduser().resolve()
-        env_val = os.environ.get(env_key)
-        if env_val:
-            return Path(env_val).expanduser().resolve()
-        toml_val = toml.get(toml_key)
-        if toml_val:
-            return Path(str(toml_val)).expanduser().resolve()
-        return None
-
-    def _resolve_token() -> str | None:
-        if hf_token is not None:
-            return hf_token
-        for key in ("OVMGR_HF_TOKEN", "HF_TOKEN"):
-            val = os.environ.get(key)
-            if val:
-                return val
-        toml_val = toml.get("hf_token")
-        if toml_val:
-            return str(toml_val)
-        return None
-
-    resolved_backend = _resolve_str(backend, "OVMGR_BACKEND", "backend", DEFAULT_BACKEND)
-    if resolved_backend not in VALID_BACKENDS:
-        raise ValueError(
-            f"Invalid backend {resolved_backend!r}. Must be one of: {', '.join(VALID_BACKENDS)}"
-        )
-
-    # Resolve "auto" to a concrete backend: baremetal > docker
-    if resolved_backend == "auto":
-        if shutil.which("ovms"):
-            resolved_backend = "baremetal"
-        elif shutil.which("docker"):
-            resolved_backend = "docker"
-        else:
-            raise click.ClickException(
-                "No OVMS backend found. Install 'ovms' on $PATH for bare-metal, "
-                "or install Docker for the docker backend. "
-                "You can also set --backend explicitly."
-            )
+    def _opt_path(cli_val: Path | None, env_key: str, toml_key: str) -> Path | None:
+        return _resolve_optional_path(toml, cli_val, env_key, toml_key)
 
     return Config(
-        backend=resolved_backend,
-        models_dir=_resolve_path(models_dir, "OVMGR_MODELS_DIR", "models_dir", DEFAULT_MODELS_DIR),
-        cache_dir=_resolve_path(cache_dir, "OVMGR_CACHE_DIR", "cache_dir", DEFAULT_CACHE_DIR),
-        hf_token=_resolve_token(),
-        docker_image=_resolve_str(
-            docker_image, "OVMGR_DOCKER_IMAGE", "docker_image", DEFAULT_DOCKER_IMAGE
-        ),
-        server_host=_resolve_str(
-            server_host, "OVMGR_SERVER_HOST", "server_host", DEFAULT_SERVER_HOST
-        ),
-        server_port=_resolve_int(
-            server_port, "OVMGR_SERVER_PORT", "server_port", DEFAULT_SERVER_PORT
-        ),
-        webui_host=_resolve_str(webui_host, "OVMGR_WEBUI_HOST", "webui_host", DEFAULT_WEBUI_HOST),
-        webui_port=_resolve_int(webui_port, "OVMGR_WEBUI_PORT", "webui_port", DEFAULT_WEBUI_PORT),
-        webui_data_dir=_resolve_optional_path(
-            webui_data_dir, "OVMGR_WEBUI_DATA_DIR", "webui_data_dir"
-        ),
-        webui_image=_resolve_str(
-            webui_image, "OVMGR_WEBUI_IMAGE", "webui_image", DEFAULT_WEBUI_IMAGE
-        ),
+        backend=_resolve_backend(toml, backend),
+        models_dir=_path(models_dir, "OVMGR_MODELS_DIR", "models_dir", DEFAULT_MODELS_DIR),
+        cache_dir=_path(cache_dir, "OVMGR_CACHE_DIR", "cache_dir", DEFAULT_CACHE_DIR),
+        hf_token=_resolve_token(toml, hf_token),
+        docker_image=_str(docker_image, "OVMGR_DOCKER_IMAGE", "docker_image", DEFAULT_DOCKER_IMAGE),
+        server_host=_str(server_host, "OVMGR_SERVER_HOST", "server_host", DEFAULT_SERVER_HOST),
+        server_port=_int(server_port, "OVMGR_SERVER_PORT", "server_port", DEFAULT_SERVER_PORT),
+        webui_host=_str(webui_host, "OVMGR_WEBUI_HOST", "webui_host", DEFAULT_WEBUI_HOST),
+        webui_port=_int(webui_port, "OVMGR_WEBUI_PORT", "webui_port", DEFAULT_WEBUI_PORT),
+        webui_data_dir=_opt_path(webui_data_dir, "OVMGR_WEBUI_DATA_DIR", "webui_data_dir"),
+        webui_image=_str(webui_image, "OVMGR_WEBUI_IMAGE", "webui_image", DEFAULT_WEBUI_IMAGE),
     )

@@ -546,6 +546,37 @@ def register_model(config: Config, name: str, model_path: str | None) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _unregister_model(config: Config, config_json: Path, name: str) -> None:
+    """Unregister *name* from config.json via the backend, with error formatting."""
+    backend = get_backend(config)
+    remove_params = RemoveParams(
+        config_json_path=config_json,
+        model_name=name,
+    )
+    console.rule(f"[bold]Unregistering[/bold] {name}")
+    try:
+        backend.remove(remove_params)
+    except click.ClickException:
+        console.print(
+            Panel(
+                f"[bold red]Unregister failed.[/bold red] "
+                f"Could not remove [cyan]{name}[/cyan] from config.json.",
+                title="Error",
+                border_style="red",
+            )
+        )
+        raise
+    except Exception as exc:
+        console.print(
+            Panel(
+                f"[bold red]Unregister failed:[/bold red] {exc}",
+                title="Error",
+                border_style="red",
+            )
+        )
+        raise click.Abort() from exc
+
+
 @models.command("rm")
 @click.argument("name")
 @click.option(
@@ -601,33 +632,7 @@ def remove_model(config: Config, name: str, purge: bool, yes: bool) -> None:
 
     # Step 1: Unregister
     if is_registered:
-        backend = get_backend(config)
-        remove_params = RemoveParams(
-            config_json_path=config_json,
-            model_name=name,
-        )
-        console.rule(f"[bold]Unregistering[/bold] {name}")
-        try:
-            backend.remove(remove_params)
-        except click.ClickException:
-            console.print(
-                Panel(
-                    f"[bold red]Unregister failed.[/bold red] "
-                    f"Could not remove [cyan]{name}[/cyan] from config.json.",
-                    title="Error",
-                    border_style="red",
-                )
-            )
-            raise
-        except Exception as exc:
-            console.print(
-                Panel(
-                    f"[bold red]Unregister failed:[/bold red] {exc}",
-                    title="Error",
-                    border_style="red",
-                )
-            )
-            raise click.Abort() from exc
+        _unregister_model(config, config_json, name)
 
     # Step 2: Delete files
     if purge:
